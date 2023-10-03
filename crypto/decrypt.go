@@ -8,8 +8,8 @@ import (
 	"github.com/fainc/go-crypto/rsa"
 )
 
-// Decrypt 数据解密便捷代理方法 option可传证书密码或自定义IV
-func Decrypt(algo, key, data string, hex bool, options ...string) (decrypted string, err error) {
+// EasyDecrypt 数据解密便捷代理方法 option可传证书密码或自定义IV,algo 支持algo列表 algorithm.SupportedAlgo
+func EasyDecrypt(algo, key, data string, hex bool, options ...string) (decrypted string, err error) {
 	option := ""
 	if len(options) == 1 && options[0] != "" {
 		option = options[0]
@@ -28,7 +28,7 @@ func Decrypt(algo, key, data string, hex bool, options ...string) (decrypted str
 	case "SM4_CFB":
 		return gm.Sm4().Decrypt(key, data, "CFB", hex)
 	case "SM4_OFB":
-		return gm.Sm4().Decrypt(key, data, "CFB", hex)
+		return gm.Sm4().Decrypt(key, data, "OFB", hex)
 	case "RSA_PKCS1":
 		return rsa.DecryptPKCS1(key, data, hex)
 	case "AES_CBC_PKCS7":
