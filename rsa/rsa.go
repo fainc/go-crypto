@@ -8,6 +8,8 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
+
+	"github.com/fainc/go-crypto/format"
 )
 
 func gen(bits int) (x509PrivateKey, x509PublicKey []byte, err error) {
@@ -37,28 +39,19 @@ func GenerateFormat(bits int) (pri string, pub string, err error) {
 	if err != nil {
 		return
 	}
-	pri = formatKey(x509PrivateKey, "RSA PRIVATE KEY")
-	pub = formatKey(X509PublicKey, "RSA PUBLIC KEY")
+	pri = format.PemFormat(x509PrivateKey, "RSA PRIVATE KEY")
+	pub = format.PemFormat(X509PublicKey, "RSA PUBLIC KEY")
 	return
-}
-
-// formatKey 格式化密钥 t = RSA PUBLIC KEY \ RSA PRIVATE KEY
-func formatKey(b []byte, t string) (priPem string) {
-	pri := pem.EncodeToMemory(&pem.Block{
-		Type:  t,
-		Bytes: b,
-	})
-	return string(pri)
 }
 
 // Base64ToPem base64 未格式化密钥转pem格式 t = RSA PUBLIC KEY \ RSA PRIVATE KEY
 func Base64ToPem(b, t string) (priPem string) {
 	d, _ := base64.StdEncoding.DecodeString(b)
-	return formatKey(d, t)
+	return format.PemFormat(d, t)
 }
 
 // Encrypt PKCS1 加密 ,PKCS8证书 需要先转换格式
-func Encrypt(plainText, pub string, isHex bool) (cipherTextStr string, err error) {
+func Encrypt(pub, plainText string, returnHex bool) (cipherTextStr string, err error) {
 	block, _ := pem.Decode([]byte(pub)) // 解码
 	if block == nil {
 		err = errors.New("public key error")
@@ -77,14 +70,11 @@ func Encrypt(plainText, pub string, isHex bool) (cipherTextStr string, err error
 		err = errors.New("rsa encrypt failed")
 		return
 	}
-	if isHex {
-		return hex.EncodeToString(cipherText), nil
-	}
-	return base64.StdEncoding.EncodeToString(cipherText), nil
+	return format.ResHandler(cipherText, returnHex, false), nil
 }
 
 // Decrypt PKCS1 解密 ,PKCS8证书 需要先转换格式
-func Decrypt(ciphertext, pri, format string) (res string, err error) {
+func Decrypt(pri, ciphertext string, isHex bool) (res string, err error) {
 	block, _ := pem.Decode([]byte(pri))
 	if block == nil {
 		err = errors.New("private key error")
@@ -98,7 +88,7 @@ func Decrypt(ciphertext, pri, format string) (res string, err error) {
 	}
 	// 解密
 	var decodeString []byte
-	if format == "hex" {
+	if isHex {
 		decodeString, err = hex.DecodeString(ciphertext)
 		if err != nil {
 			return

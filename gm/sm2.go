@@ -9,6 +9,8 @@ import (
 
 	"github.com/tjfoc/gmsm/sm2"
 	"github.com/tjfoc/gmsm/x509"
+
+	"github.com/fainc/go-crypto/format"
 )
 
 type sm2Crypto struct {
@@ -23,7 +25,7 @@ func (rec *sm2Crypto) sm2generateKey() (key *sm2.PrivateKey, err error) {
 		return
 	}
 	if !key.Curve.IsOnCurve(key.X, key.Y) {
-		err = errors.New("生成密钥非SM2曲线")
+		err = errors.New("key is not on curve")
 		return
 	}
 	return
@@ -65,7 +67,7 @@ func (rec *sm2Crypto) GenerateKey(pwd string) (pri, pub, priHex, pubHex string, 
 func (rec *sm2Crypto) ReadPrivateKeyFromPem(priPem, password string) (pri *sm2.PrivateKey, err error) {
 	pri, err = x509.ReadPrivateKeyFromPem([]byte(priPem), []byte(password))
 	if err != nil {
-		err = errors.New("加载私钥证书失败，请检查私钥证书和证书密码（若有）")
+		err = errors.New("read private key from pem failed")
 		return
 	}
 	return
@@ -73,12 +75,12 @@ func (rec *sm2Crypto) ReadPrivateKeyFromPem(priPem, password string) (pri *sm2.P
 func (rec *sm2Crypto) ReadPrivateKeyFromPath(filePath, password string) (pri *sm2.PrivateKey, err error) {
 	f, err := os.ReadFile(filePath)
 	if err != nil {
-		err = errors.New("读取密钥证书文件失败")
+		err = errors.New("read private key from path failed")
 		return
 	}
 	pri, err = x509.ReadPrivateKeyFromPem(f, []byte(password))
 	if err != nil {
-		err = errors.New("加载私钥证书失败，请检查私钥证书和证书密码（若有）")
+		err = errors.New("read private key from pem failed")
 		return
 	}
 	return
@@ -87,7 +89,7 @@ func (rec *sm2Crypto) ReadPrivateKeyFromPath(filePath, password string) (pri *sm
 func (rec *sm2Crypto) ReadPublicKeyFromPem(pubPem string) (pub *sm2.PublicKey, err error) {
 	pub, err = x509.ReadPublicKeyFromPem([]byte(pubPem))
 	if err != nil {
-		err = errors.New("加载公钥证书失败，请检查证书")
+		err = errors.New("read public key from pem failed")
 		return
 	}
 	return
@@ -96,19 +98,19 @@ func (rec *sm2Crypto) ReadPublicKeyFromPem(pubPem string) (pub *sm2.PublicKey, e
 func (rec *sm2Crypto) ReadPublicKeyFromPath(filePath string) (pub *sm2.PublicKey, err error) {
 	f, err := os.ReadFile(filePath)
 	if err != nil {
-		err = errors.New("读取密钥证书文件失败")
+		err = errors.New("read public key from path failed")
 		return
 	}
 	pub, err = x509.ReadPublicKeyFromPem(f)
 	if err != nil {
-		err = errors.New("加载公钥证书失败，请检查证书")
+		err = errors.New("read public key from pem failed")
 		return
 	}
 	return
 }
 func (rec *sm2Crypto) EncryptAsn1(pubPem, data string, returnHex bool) (cipherText string, err error) {
 	if data == "" {
-		err = errors.New("不支持空内容加密")
+		err = errors.New("data can not be null")
 		return
 	}
 	pub, err := x509.ReadPublicKeyFromPem([]byte(pubPem))
@@ -119,13 +121,13 @@ func (rec *sm2Crypto) EncryptAsn1(pubPem, data string, returnHex bool) (cipherTe
 	if err != nil {
 		return
 	}
-	return formatRet(cipher, returnHex), nil
+	return format.ResHandler(cipher, returnHex, false), nil
 }
 
 // Encrypt mode 0 C1C3C2 mode1 C1C2C3
 func (rec *sm2Crypto) Encrypt(pubPem, data string, mode int, returnHex bool) (cipherText string, err error) {
 	if data == "" {
-		err = errors.New("不支持空内容加密")
+		err = errors.New("data can not be null")
 		return
 	}
 	pub, err := x509.ReadPublicKeyFromPem([]byte(pubPem))
@@ -136,7 +138,7 @@ func (rec *sm2Crypto) Encrypt(pubPem, data string, mode int, returnHex bool) (ci
 	if err != nil {
 		return
 	}
-	return formatRet(cipher, returnHex), nil
+	return format.ResHandler(cipher, returnHex, false), nil
 }
 func (rec *sm2Crypto) DecryptAsn1(priPem, pwd, data string, isHex bool) (plainText string, err error) {
 	if data == "" {
@@ -148,27 +150,27 @@ func (rec *sm2Crypto) DecryptAsn1(priPem, pwd, data string, isHex bool) (plainTe
 	}
 	pri, err := x509.ReadPrivateKeyFromPem([]byte(priPem), password)
 	if err != nil {
-		err = errors.New("加载私钥证书失败，请检查私钥证书和证书密码（若有）")
+		err = errors.New("read private key from pem failed")
 		return
 	}
 	var d []byte
 	if isHex {
 		d, err = hex.DecodeString(data)
 		if err != nil {
-			err = errors.New("待解密数据处理失败")
+			err = errors.New("hex decode failed")
 			return
 		}
 	} else {
 		d, err = base64.StdEncoding.DecodeString(data)
 		if err != nil {
-			err = errors.New("待解密数据处理失败")
+			err = errors.New("base64 decode failed")
 			return
 		}
 	}
 
 	plain, err := pri.DecryptAsn1(d) // sm2解密
 	if err != nil || plain == nil {
-		err = errors.New("数据解密失败，请核对私钥证书是否正确")
+		err = errors.New("decrypted failed")
 		return
 	}
 	return string(plain), nil
@@ -185,26 +187,26 @@ func (rec *sm2Crypto) Decrypt(priPem, pwd, data string, mode int, isHex bool) (p
 	}
 	pri, err := x509.ReadPrivateKeyFromPem([]byte(priPem), password)
 	if err != nil {
-		err = errors.New("加载私钥证书失败，请检查私钥证书和证书密码（若有）")
+		err = errors.New("read private key from pem failed")
 		return
 	}
 	var d []byte
 	if isHex {
 		d, err = hex.DecodeString(data)
 		if err != nil {
-			err = errors.New("待解密数据处理失败")
+			err = errors.New("hex decode failed")
 			return
 		}
 	} else {
 		d, err = base64.StdEncoding.DecodeString(data)
 		if err != nil {
-			err = errors.New("待解密数据处理失败")
+			err = errors.New("base64 decode failed")
 			return
 		}
 	}
 	plain, err := sm2.Decrypt(pri, d, mode)
 	if err != nil || plain == nil {
-		err = errors.New("数据解密失败，请核对私钥证书是否正确")
+		err = errors.New("decrypted failed")
 		return
 	}
 	return string(plain), nil
@@ -214,7 +216,7 @@ func (rec *sm2Crypto) Decrypt(priPem, pwd, data string, mode int, isHex bool) (p
 // 与其它语言或库互通时 需要仔细核对 sm3 杂凑、userId、asn.1 der编码是否各端一致
 func (rec *sm2Crypto) PrivateSign(priPem, pwd, data string, returnHex bool) (signStr string, err error) {
 	if data == "" {
-		err = errors.New("不支持空内容加签")
+		err = errors.New("data can not be null")
 		return
 	}
 	var password []byte
@@ -223,15 +225,15 @@ func (rec *sm2Crypto) PrivateSign(priPem, pwd, data string, returnHex bool) (sig
 	}
 	pri, err := x509.ReadPrivateKeyFromPem([]byte(priPem), password)
 	if err != nil {
-		err = errors.New("加载私钥证书失败，请检查私钥证书和证书密码（若有）")
+		err = errors.New("read private key from pem failed")
 		return
 	}
 	sign, err := pri.Sign(rand.Reader, []byte(data), nil) // sm2签名
 	if err != nil {
-		err = errors.New("签名失败，请检查私钥证书")
+		err = errors.New("signed failed")
 		return
 	}
-	return formatRet(sign, returnHex), nil
+	return format.ResHandler(sign, returnHex, false), nil
 }
 
 // PublicVerify 签名验证 der编解码 sm3杂凑
@@ -241,25 +243,25 @@ func (rec *sm2Crypto) PrivateSign(priPem, pwd, data string, returnHex bool) (sig
 
 func (rec *sm2Crypto) PublicVerify(pubPem, data, sign string, isHex bool) (ok bool, err error) {
 	if data == "" {
-		err = errors.New("不支持空内容验签")
+		err = errors.New("data can not be null")
 		return
 	}
 	pub, err := x509.ReadPublicKeyFromPem([]byte(pubPem))
 	if err != nil {
-		err = errors.New("加载私钥证书失败，请检查私钥证书和证书密码（若有）")
+		err = errors.New("read public key from pem failed")
 		return
 	}
 	var sd []byte
 	if isHex {
 		sd, err = hex.DecodeString(sign)
 		if err != nil {
-			err = errors.New("签名数据处理失败")
+			err = errors.New("hex decode failed")
 			return
 		}
 	} else {
 		sd, err = base64.StdEncoding.DecodeString(sign)
 		if err != nil {
-			err = errors.New("签名数据处理失败")
+			err = errors.New("base 64 decode failed")
 			return
 		}
 	}

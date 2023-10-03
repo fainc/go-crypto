@@ -15,9 +15,9 @@ func CBC() *cbcCrypto {
 }
 
 // Encrypt AES CBC 加密
-func (rec *cbcCrypto) Encrypt(text, key string, ivOption ...string) (string, error) {
+func (rec *cbcCrypto) Encrypt(key, text string, ivOption ...string) (string, error) {
 	if text == "" {
-		return "", errors.New("不支持空内容加密")
+		return "", errors.New("data can not be null")
 	}
 	ivStr := "0000000000000000"
 	if ivOption != nil || len(ivOption) >= 1 {
@@ -40,7 +40,7 @@ func (rec *cbcCrypto) Encrypt(text, key string, ivOption ...string) (string, err
 	return base64.StdEncoding.EncodeToString(encrypted), nil
 }
 
-func (rec *cbcCrypto) Decrypt(text, key string, ivOption ...string) (string, error) {
+func (rec *cbcCrypto) Decrypt(key, text string, ivOption ...string) (string, error) {
 	if text == "" {
 		return "", nil
 	}
@@ -66,7 +66,7 @@ func (rec *cbcCrypto) Decrypt(text, key string, ivOption ...string) (string, err
 	blockMode.CryptBlocks(origData, ciphertext)
 	origData = PKCS7UnPadding(origData)
 	if origData == nil {
-		return "", errors.New("AES解密错误，请核对密钥和密文")
+		return "", errors.New("decrypted failed")
 	}
 	return string(origData), nil
 }

@@ -6,6 +6,8 @@ import (
 	"errors"
 
 	"github.com/tjfoc/gmsm/sm4"
+
+	"github.com/fainc/go-crypto/format"
 )
 
 type sm4Crypto struct {
@@ -25,20 +27,20 @@ func (rec *sm4Crypto) operate(key, data []byte, mode string, isEncrypt bool) (ou
 	case "OFB":
 		out, err = sm4.Sm4OFB(key, data, isEncrypt)
 	default:
-		err = errors.New("不支持的加解密模式：" + mode)
+		err = errors.New("unsupported mode：" + mode)
 	}
 	return
 }
-func (rec *sm4Crypto) Encrypt(key, data, mode string, isHex bool) (outStr string, err error) {
+func (rec *sm4Crypto) Encrypt(key, data, mode string, returnHex bool) (outStr string, err error) {
 	if data == "" {
-		err = errors.New("不支持空内容加密")
+		err = errors.New("value can't be null")
 		return
 	}
 	out, err := rec.operate([]byte(key), []byte(data), mode, true)
 	if err != nil {
 		return
 	}
-	return formatRet(out, isHex), nil
+	return format.ResHandler(out, returnHex, false), nil
 }
 func (rec *sm4Crypto) Decrypt(key, data, mode string, isHex bool) (outStr string, err error) {
 	if data == "" {
@@ -48,13 +50,13 @@ func (rec *sm4Crypto) Decrypt(key, data, mode string, isHex bool) (outStr string
 	if isHex {
 		db, err = hex.DecodeString(data)
 		if err != nil {
-			err = errors.New("处理待解密数据失败")
+			err = errors.New("hex decode failed")
 			return
 		}
 	} else {
 		db, err = base64.StdEncoding.DecodeString(data)
 		if err != nil {
-			err = errors.New("处理待解密数据失败")
+			err = errors.New("base64 decode failed")
 			return
 		}
 	}
@@ -63,7 +65,7 @@ func (rec *sm4Crypto) Decrypt(key, data, mode string, isHex bool) (outStr string
 		return
 	}
 	if out == nil {
-		err = errors.New("数据解密失败，请核实密钥")
+		err = errors.New("decrypted failed")
 		return
 	}
 	outStr = string(out)
