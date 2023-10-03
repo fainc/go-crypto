@@ -123,7 +123,7 @@ func (rec *sm2Crypto) EncryptAsn1(pubPem, data string, returnHex bool) (cipherTe
 }
 
 // Encrypt mode 0 C1C3C2 mode1 C1C2C3
-func (rec *sm2Crypto) Encrypt(pubPem, data string, returnHex bool, mode int) (cipherText string, err error) {
+func (rec *sm2Crypto) Encrypt(pubPem, data string, mode int, returnHex bool) (cipherText string, err error) {
 	if data == "" {
 		err = errors.New("不支持空内容加密")
 		return
@@ -175,7 +175,7 @@ func (rec *sm2Crypto) DecryptAsn1(priPem, pwd, data string, isHex bool) (plainTe
 }
 
 // Decrypt mode 0 C1C3C2 mode1 C1C2C3
-func (rec *sm2Crypto) Decrypt(priPem, pwd, data string, isHex bool, mode int) (plainText string, err error) {
+func (rec *sm2Crypto) Decrypt(priPem, pwd, data string, mode int, isHex bool) (plainText string, err error) {
 	if data == "" {
 		return
 	}

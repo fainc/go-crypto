@@ -13,12 +13,9 @@ type sm3Crypto struct {
 func Sm3() *sm3Crypto {
 	return &sm3Crypto{}
 }
-func (rec *sm3Crypto) Sum(data string, returnHex bool, salt ...string) (output string) {
+func (rec *sm3Crypto) Sum(data string, returnHex bool) (output string) {
 	h := sm3.New()
 	str := data
-	if len(salt) >= 1 {
-		str += salt[0]
-	}
 	h.Write([]byte(str))
 	sum := h.Sum(nil)
 	return formatRet(sum, returnHex)

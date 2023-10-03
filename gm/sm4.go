@@ -29,7 +29,7 @@ func (rec *sm4Crypto) operate(key, data []byte, mode string, isEncrypt bool) (ou
 	}
 	return
 }
-func (rec *sm4Crypto) Encrypt(mode, key, data string, isHex bool) (outStr string, err error) {
+func (rec *sm4Crypto) Encrypt(key, data, mode string, isHex bool) (outStr string, err error) {
 	if data == "" {
 		err = errors.New("不支持空内容加密")
 		return
@@ -40,7 +40,7 @@ func (rec *sm4Crypto) Encrypt(mode, key, data string, isHex bool) (outStr string
 	}
 	return formatRet(out, isHex), nil
 }
-func (rec *sm4Crypto) Decrypt(mode, key, data string, isHex bool) (outStr string, err error) {
+func (rec *sm4Crypto) Decrypt(key, data, mode string, isHex bool) (outStr string, err error) {
 	if data == "" {
 		return "", nil
 	}
