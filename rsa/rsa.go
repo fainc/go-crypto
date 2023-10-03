@@ -50,8 +50,8 @@ func Base64ToPem(b, t string) (priPem string) {
 	return format.PemFormat(d, t)
 }
 
-// Encrypt PKCS1 加密 ,PKCS8证书 需要先转换格式
-func Encrypt(pub, plainText string, returnHex bool) (cipherTextStr string, err error) {
+// EncryptPKCS1 PKCS1 加密 ,PKCS8证书 需要先转换格式
+func EncryptPKCS1(pub, plainText string, returnHex bool) (cipherTextStr string, err error) {
 	block, _ := pem.Decode([]byte(pub)) // 解码
 	if block == nil {
 		err = errors.New("public key error")
@@ -73,8 +73,8 @@ func Encrypt(pub, plainText string, returnHex bool) (cipherTextStr string, err e
 	return format.ResHandler(cipherText, returnHex, false), nil
 }
 
-// Decrypt PKCS1 解密 ,PKCS8证书 需要先转换格式
-func Decrypt(pri, ciphertext string, isHex bool) (res string, err error) {
+// DecryptPKCS1 PKCS1 解密 ,PKCS8证书 需要先转换格式
+func DecryptPKCS1(pri, ciphertext string, isHex bool) (res string, err error) {
 	block, _ := pem.Decode([]byte(pri))
 	if block == nil {
 		err = errors.New("private key error")

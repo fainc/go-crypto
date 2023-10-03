@@ -14,13 +14,16 @@ func CBC() *cbcCrypto {
 	return &cbcCrypto{}
 }
 
-// Encrypt AES CBC 加密
-func (rec *cbcCrypto) Encrypt(key, text string, ivOption ...string) (string, error) {
+// EncryptPKCS7 AES CBC
+func (rec *cbcCrypto) EncryptPKCS7(key, text string, ivOption ...string) (string, error) {
 	if text == "" {
 		return "", errors.New("data can not be null")
 	}
 	ivStr := "0000000000000000"
-	if ivOption != nil || len(ivOption) >= 1 {
+	if len(ivOption) == 1 && ivOption[0] != "" {
+		if len(ivOption[0]) != 16 {
+			return "", errors.New("IV length must be 16")
+		}
 		ivStr = ivOption[0]
 	}
 	iv := []byte(ivStr)
@@ -40,12 +43,15 @@ func (rec *cbcCrypto) Encrypt(key, text string, ivOption ...string) (string, err
 	return base64.StdEncoding.EncodeToString(encrypted), nil
 }
 
-func (rec *cbcCrypto) Decrypt(key, text string, ivOption ...string) (string, error) {
+func (rec *cbcCrypto) DecryptPKCS7(key, text string, ivOption ...string) (string, error) {
 	if text == "" {
 		return "", nil
 	}
 	ivStr := "0000000000000000"
-	if ivOption != nil || len(ivOption) >= 1 {
+	if len(ivOption) == 1 && ivOption[0] != "" {
+		if len(ivOption[0]) != 16 {
+			return "", errors.New("IV length must be 16")
+		}
 		ivStr = ivOption[0]
 	}
 	iv := []byte(ivStr)
