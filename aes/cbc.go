@@ -16,46 +16,36 @@ func CBC() *cbcCrypto {
 
 // EncryptPKCS7 AES CBC
 func (rec *cbcCrypto) EncryptPKCS7(key, text string, ivOption ...string) (string, error) {
-	if text == "" {
-		return "", errors.New("data can not be null")
-	}
-	ivStr := "0000000000000000"
-	if len(ivOption) == 1 && ivOption[0] != "" {
-		if len(ivOption[0]) != 16 {
-			return "", errors.New("IV length must be 16")
-		}
-		ivStr = ivOption[0]
-	}
-	iv := []byte(ivStr)
-	plaintext := []byte(text)
-	block, err := aes.NewCipher([]byte(key))
-	if err != nil {
-		return "", err
-	}
-	blockSize := block.BlockSize()
-	if len(iv) != blockSize {
-		return "", errors.New("IV length must equal block size")
-	}
-	plaintext = PKCS7Padding(plaintext, blockSize)
-	blockMode := cipher.NewCBCEncrypter(block, iv)
-	encrypted := make([]byte, len(plaintext))
-	blockMode.CryptBlocks(encrypted, plaintext)
-	return base64.StdEncoding.EncodeToString(encrypted), nil
+	return rec.Encrypt(key, text, ivOption...)
 }
 
-func (rec *cbcCrypto) DecryptPKCS7(key, text string, ivOption ...string) (string, error) {
+func (rec *cbcCrypto) Encrypt(key, text string, ivOption ...string) (string, error) {
 	if text == "" {
-		return "", nil
+		return "", errors.New("empty data encrypt is unnecessary")
 	}
-	ivStr := "0000000000000000"
-	if len(ivOption) == 1 && ivOption[0] != "" {
-		if len(ivOption[0]) != 16 {
-			return "", errors.New("IV length must be 16")
+	block, err := aes.NewCipher([]byte(key))
+	if err != nil {
+		return "", err
+	}
+	blockSize := block.BlockSize()
+	plainText := PKCS7Padding([]byte(text), blockSize)
+	ivValue := ([]byte)(nil)
+	if len(ivOption) > 0 {
+		if len(ivOption[0]) != blockSize {
+			return "", errors.New("IV length must equal block size")
 		}
-		ivStr = ivOption[0]
+		ivValue = []byte(ivOption[0])
+	} else {
+		ivValue = []byte("0000000000000000")
 	}
-	iv := []byte(ivStr)
-	ciphertext, err := base64.StdEncoding.DecodeString(text)
+	blockMode := cipher.NewCBCEncrypter(block, ivValue)
+	cipherText := make([]byte, len(plainText))
+	blockMode.CryptBlocks(cipherText, plainText)
+	return base64.StdEncoding.EncodeToString(cipherText), nil
+}
+
+func (rec *cbcCrypto) Decrypt(key, text string, ivOption ...string) (string, error) {
+	cipherText, err := base64.StdEncoding.DecodeString(text)
 	if err != nil {
 		return "", err
 	}
@@ -64,15 +54,33 @@ func (rec *cbcCrypto) DecryptPKCS7(key, text string, ivOption ...string) (string
 		return "", err
 	}
 	blockSize := block.BlockSize()
-	if len(iv) != blockSize {
-		return "", errors.New("IV length must equal block size")
+	if len(cipherText) < blockSize {
+		return "", errors.New("cipherText too short")
 	}
-	blockMode := cipher.NewCBCDecrypter(block, iv[:blockSize])
-	origData := make([]byte, len(ciphertext))
-	blockMode.CryptBlocks(origData, ciphertext)
-	origData = PKCS7UnPadding(origData)
-	if origData == nil {
+	ivValue := ([]byte)(nil)
+	if len(ivOption) > 0 {
+		if len(ivOption[0]) != blockSize {
+			return "", errors.New("IV length must equal block size")
+		}
+		ivValue = []byte(ivOption[0])
+	} else {
+		ivValue = []byte("0000000000000000")
+	}
+	if len(cipherText)%blockSize != 0 {
+		return "", errors.New("cipherText is not a multiple of the block size")
+	}
+	blockModel := cipher.NewCBCDecrypter(block, ivValue)
+	plainText := make([]byte, len(cipherText))
+	blockModel.CryptBlocks(plainText, cipherText)
+	plainText, e := PKCS7UnPadding(plainText, blockSize)
+	if e != nil {
+		return "", e
+	}
+	if plainText == nil {
 		return "", errors.New("decrypted failed")
 	}
-	return string(origData), nil
+	return string(plainText), nil
+}
+func (rec *cbcCrypto) DecryptPKCS7(key, text string, ivOption ...string) (string, error) {
+	return rec.Decrypt(key, text, ivOption...)
 }
