@@ -2,10 +2,8 @@ package gm
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"os"
 
 	"github.com/tjfoc/gmsm/sm2"
 	"github.com/tjfoc/gmsm/x509"
@@ -13,227 +11,88 @@ import (
 	"github.com/fainc/go-crypto/format"
 )
 
-type sm2Crypto struct {
+type sm2Pub struct {
+	public *sm2.PublicKey
 }
 
-func Sm2() *sm2Crypto {
-	return &sm2Crypto{}
-}
-func (rec *sm2Crypto) sm2generateKey() (key *sm2.PrivateKey, err error) {
-	key, err = sm2.GenerateKey(rand.Reader)
-	if err != nil {
-		return
-	}
-	if !key.Curve.IsOnCurve(key.X, key.Y) {
-		err = errors.New("key is not on curve")
-		return
-	}
-	return
+type sm2Pri struct {
+	private *sm2.PrivateKey
 }
 
-// GenerateKey 生成国密 SM2 密钥
-func (rec *sm2Crypto) GenerateKey(pwd string) (pri, pub, priHex, pubHex string, err error) {
-	var password []byte
-	if pwd != "" {
-		password = []byte(pwd)
-	}
-	key, err := rec.sm2generateKey()
+// NewSM2Public 公钥操作，加密、验签，密钥使用未经 der 编码的 hex
+func NewSM2Public(publicHex string) *sm2Pub {
+	pub, err := x509.ReadPublicKeyFromHex(publicHex)
 	if err != nil {
-		return
+		panic(err)
 	}
-	priByte, err := x509.WritePrivateKeyToPem(key, password) // 生成密钥文件
-	if err != nil {
-		return
-	}
-	pubKey, _ := key.Public().(*sm2.PublicKey)
-	pubByte, err := x509.WritePublicKeyToPem(pubKey) // 生成公钥文件
-	if err != nil {
-		return
-	}
-	pri = string(priByte)
-	pub = string(pubByte)
-
-	// 解决前后端对接问题，hex密钥输出给JS端使用
-	// 前后端对接注意JS 是否需要要给公钥和密文处理04标识
-	// https://github.com/JuneAndGreen/sm-crypto/issues/42
-
-	// 私钥 hex
-	priHex = hex.EncodeToString(key.D.Bytes())
-	// 公钥 hex（如需移除04软件标识请自行处理）
-	pubHex = "04" + hex.EncodeToString(pubKey.X.Bytes()) + hex.EncodeToString(pubKey.Y.Bytes())
-	return
+	return &sm2Pub{pub}
 }
 
-func (rec *sm2Crypto) ReadPrivateKeyFromPem(priPem, password string) (pri *sm2.PrivateKey, err error) {
-	pri, err = x509.ReadPrivateKeyFromPem([]byte(priPem), []byte(password))
+// NewSM2Private 私钥操作，解密、加签，密钥使用未经 der 编码的 hex
+func NewSM2Private(privateHex string) *sm2Pri {
+	pri, err := x509.ReadPrivateKeyFromHex(privateHex)
 	if err != nil {
-		err = errors.New("read private key from pem failed")
-		return
+		panic(err)
 	}
-	return
-}
-func (rec *sm2Crypto) ReadPrivateKeyFromPath(filePath, password string) (pri *sm2.PrivateKey, err error) {
-	f, err := os.ReadFile(filePath)
-	if err != nil {
-		err = errors.New("read private key from path failed")
-		return
-	}
-	pri, err = x509.ReadPrivateKeyFromPem(f, []byte(password))
-	if err != nil {
-		err = errors.New("read private key from pem failed")
-		return
-	}
-	return
+	return &sm2Pri{pri}
 }
 
-func (rec *sm2Crypto) ReadPublicKeyFromPem(pubPem string) (pub *sm2.PublicKey, err error) {
-	pub, err = x509.ReadPublicKeyFromPem([]byte(pubPem))
-	if err != nil {
-		err = errors.New("read public key from pem failed")
-		return
+// Encrypt mode 0 C1C3C2 mode1 C1C2C3 建议使用 mode 0，如无法解密可以尝试丢弃返回密文头部04标记
+func (rec *sm2Pub) Encrypt(plainText string, mode int, asn1 ...bool) (cipherText *format.RetFormatter, err error) {
+	if plainText == "" {
+		err = errors.New("plain text can't be empty string")
+		return nil, err
 	}
-	return
-}
-
-func (rec *sm2Crypto) ReadPublicKeyFromPath(filePath string) (pub *sm2.PublicKey, err error) {
-	f, err := os.ReadFile(filePath)
-	if err != nil {
-		err = errors.New("read public key from path failed")
-		return
-	}
-	pub, err = x509.ReadPublicKeyFromPem(f)
-	if err != nil {
-		err = errors.New("read public key from pem failed")
-		return
-	}
-	return
-}
-func (rec *sm2Crypto) EncryptAsn1(pubPem, data string, returnHex bool) (cipherText string, err error) {
-	if data == "" {
-		err = errors.New("data can not be null")
-		return
-	}
-	pub, err := x509.ReadPublicKeyFromPem([]byte(pubPem))
+	cipher, err := sm2.Encrypt(rec.public, []byte(plainText), rand.Reader, mode)
 	if err != nil {
 		return
 	}
-	cipher, err := pub.EncryptAsn1([]byte(data), rand.Reader) // sm2加密
-	if err != nil {
-		return
-	}
-	return format.ResHandler(cipher, returnHex, false), nil
-}
-
-// Encrypt mode 0 C1C3C2 mode1 C1C2C3
-func (rec *sm2Crypto) Encrypt(pubPem, data string, mode int, returnHex bool) (cipherText string, err error) {
-	if data == "" {
-		err = errors.New("data can not be null")
-		return
-	}
-	pub, err := x509.ReadPublicKeyFromPem([]byte(pubPem))
-	if err != nil {
-		return
-	}
-	cipher, err := sm2.Encrypt(pub, []byte(data), rand.Reader, mode)
-	if err != nil {
-		return
-	}
-	return format.ResHandler(cipher, returnHex, false), nil
-}
-func (rec *sm2Crypto) DecryptAsn1(priPem, pwd, data string, isHex bool) (plainText string, err error) {
-	if data == "" {
-		return
-	}
-	var password []byte
-	if pwd != "" {
-		password = []byte(pwd)
-	}
-	pri, err := x509.ReadPrivateKeyFromPem([]byte(priPem), password)
-	if err != nil {
-		err = errors.New("read private key from pem failed")
-		return
-	}
-	var d []byte
-	if isHex {
-		d, err = hex.DecodeString(data)
+	if len(asn1) != 0 && asn1[0] { // 密文转ASN.1编码格式
+		cipher, err = sm2.CipherMarshal(cipher)
 		if err != nil {
-			err = errors.New("hex decode failed")
-			return
-		}
-	} else {
-		d, err = base64.StdEncoding.DecodeString(data)
-		if err != nil {
-			err = errors.New("base64 decode failed")
 			return
 		}
 	}
+	return format.NewRet(cipher), nil
+}
 
-	plain, err := pri.DecryptAsn1(d) // sm2解密
-	if err != nil || plain == nil {
-		err = errors.New("decrypted failed")
+// DecryptWithFormat 格式转换解密实用方法，支持 hexString
+func (rec *sm2Pri) DecryptWithFormat(cipherTextHex string, mode int, asn1 ...bool) (result string, err error) {
+	cipherText, err := hex.DecodeString(cipherTextHex)
+	if err != nil {
 		return
 	}
-	return string(plain), nil
+	plainText, err := rec.Decrypt(cipherText, mode, asn1...)
+	if err != nil {
+		return
+	}
+	return string(plainText), nil
 }
 
 // Decrypt mode 0 C1C3C2 mode1 C1C2C3
-func (rec *sm2Crypto) Decrypt(priPem, pwd, data string, mode int, isHex bool) (plainText string, err error) {
-	if data == "" {
-		return
-	}
-	var password []byte
-	if pwd != "" {
-		password = []byte(pwd)
-	}
-	pri, err := x509.ReadPrivateKeyFromPem([]byte(priPem), password)
-	if err != nil {
-		err = errors.New("read private key from pem failed")
-		return
-	}
-	var d []byte
-	if isHex {
-		d, err = hex.DecodeString(data)
+func (rec *sm2Pri) Decrypt(cipherText []byte, mode int, asn1 ...bool) (plainText []byte, err error) {
+	if len(asn1) != 0 && asn1[0] { // 密文转ASN.1编码格式
+		cipherText, err = sm2.CipherUnmarshal(cipherText)
 		if err != nil {
-			err = errors.New("hex decode failed")
-			return
-		}
-	} else {
-		d, err = base64.StdEncoding.DecodeString(data)
-		if err != nil {
-			err = errors.New("base64 decode failed")
 			return
 		}
 	}
-	plain, err := sm2.Decrypt(pri, d, mode)
-	if err != nil || plain == nil {
+	plainText, err = sm2.Decrypt(rec.private, cipherText, mode)
+	if err != nil || plainText == nil {
 		err = errors.New("decrypted failed")
 		return
 	}
-	return string(plain), nil
+	return
 }
 
-// PrivateSign 签名 der编解码 sm3杂凑
+// Sign 签名 der编解码 sm3杂凑
 // 与其它语言或库互通时 需要仔细核对 sm3 杂凑、userId、asn.1 der编码是否各端一致
-func (rec *sm2Crypto) PrivateSign(priPem, pwd, data string, returnHex bool) (signStr string, err error) {
-	if data == "" {
-		err = errors.New("data can not be null")
-		return
-	}
-	var password []byte
-	if pwd != "" {
-		password = []byte(pwd)
-	}
-	pri, err := x509.ReadPrivateKeyFromPem([]byte(priPem), password)
+func (rec *sm2Pri) Sign(data string) (ret *format.RetFormatter, err error) {
+	sign, err := rec.private.Sign(rand.Reader, []byte(data), nil) // sm2签名
 	if err != nil {
-		err = errors.New("read private key from pem failed")
-		return
+		return nil, errors.New("signed failed")
 	}
-	sign, err := pri.Sign(rand.Reader, []byte(data), nil) // sm2签名
-	if err != nil {
-		err = errors.New("signed failed")
-		return
-	}
-	return format.ResHandler(sign, returnHex, false), nil
+	return format.NewRet(sign), nil
 }
 
 // PublicVerify 签名验证 der编解码 sm3杂凑
@@ -241,30 +100,12 @@ func (rec *sm2Crypto) PrivateSign(priPem, pwd, data string, returnHex bool) (sig
 //  sm2.doSignature("123", privateHex,{der:true,hash:true})
 // 与其它语言或库互通时 需要仔细核对 sm3 杂凑、userId、asn.1 der编码是否各端一致
 
-func (rec *sm2Crypto) PublicVerify(pubPem, data, sign string, isHex bool) (ok bool, err error) {
-	if data == "" {
-		err = errors.New("data can not be null")
-		return
-	}
-	pub, err := x509.ReadPublicKeyFromPem([]byte(pubPem))
+func (rec *sm2Pub) Verify(data, signHex string) (ok bool, err error) {
+	src, err := hex.DecodeString(signHex)
 	if err != nil {
-		err = errors.New("read public key from pem failed")
+		err = errors.New("hex decode failed")
 		return
 	}
-	var sd []byte
-	if isHex {
-		sd, err = hex.DecodeString(sign)
-		if err != nil {
-			err = errors.New("hex decode failed")
-			return
-		}
-	} else {
-		sd, err = base64.StdEncoding.DecodeString(sign)
-		if err != nil {
-			err = errors.New("base 64 decode failed")
-			return
-		}
-	}
-	ok = pub.Verify([]byte(data), sd) // sm2验签
+	ok = rec.public.Verify([]byte(data), src) // sm2验签
 	return
 }

@@ -6,9 +6,9 @@ import (
 	"github.com/fainc/go-crypto/format"
 )
 
-func Encrypt(str string, toUpper bool) string {
+func Sum(str string) *format.RetFormatter {
 	h := md5.New() //nolint:gosec
 	h.Write([]byte(str))
-	d := h.Sum(nil)
-	return format.ResHandler(d, true, toUpper)
+	sum := h.Sum(nil)
+	return format.NewRet(sum)
 }
