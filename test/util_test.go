@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fainc/go-crypto/aes"
+	"github.com/fainc/go-crypto/ecdsa"
 	"github.com/fainc/go-crypto/gm"
 	"github.com/fainc/go-crypto/keypair"
 	"github.com/fainc/go-crypto/md5"
@@ -114,4 +115,25 @@ func TestRSA_Encrypt(t *testing.T) {
 	fmt.Println("密文", encrypt.ToBase64String())
 	fmt.Println("解密", decrypted)
 	fmt.Println("一致", decrypted == plainText)
+}
+
+func TestECDSA_GenKey(t *testing.T) {
+	pri, pub, err := ecdsa.GenKey()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(pri.ToBase64String())
+	fmt.Println(pub.ToBase64String())
+	der, err := ecdsa.PrivateKeyToPem(pri.Bytes())
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	key, err := ecdsa.PrivatePemToKey(der)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(key)
 }

@@ -7,6 +7,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+
+	"github.com/fainc/go-crypto/format"
 )
 
 var (
@@ -15,52 +17,28 @@ var (
 	errNotECPrivateKey     = errors.New("key is not a valid ECDSA private key")
 )
 
-func GenKey() (pubStr, priStr string, err error) {
-	generateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+func GenKey() (pri, pub *format.RetFormatter, err error) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return
 	}
-	derText, err := x509.MarshalECPrivateKey(generateKey)
+	priDer, err := x509.MarshalECPrivateKey(key)
 	if err != nil {
 		return
 	}
-	pubDerText, err := x509.MarshalPKIXPublicKey(&generateKey.PublicKey)
+	pubDer, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
 	if err != nil {
 		return
 	}
-	priBlock := pem.Block{
-		Type:  "ECDSA Private Key",
-		Bytes: derText,
-	}
-	pri := pem.EncodeToMemory(&priBlock)
-	pubBlock := pem.Block{
-		Type:  "ECDSA Public Key",
-		Bytes: pubDerText,
-	}
-	pub := pem.EncodeToMemory(&pubBlock)
-	if pub == nil || pri == nil {
-		err = errors.New("gen key failed")
-		return
-	}
-	pubStr = string(pub)
-	priStr = string(pri)
-	return
+	return format.NewRet(priDer), format.NewRet(pubDer), nil
 }
 
-func ParsePrivateKeyFromPEM(pemStr string) (*ecdsa.PrivateKey, error) {
-	key := []byte(pemStr)
+func ParsePrivateKeyFromDer(priDer []byte) (*ecdsa.PrivateKey, error) {
 	var err error
-
-	// Parse PEM block
-	var block *pem.Block
-	if block, _ = pem.Decode(key); block == nil {
-		return nil, errKeyMustBePEMEncoded
-	}
-
 	// Parse the key
 	var parsedKey interface{}
-	if parsedKey, err = x509.ParseECPrivateKey(block.Bytes); err != nil {
-		if parsedKey, err = x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
+	if parsedKey, err = x509.ParseECPrivateKey(priDer); err != nil {
+		if parsedKey, err = x509.ParsePKCS8PrivateKey(priDer); err != nil {
 			return nil, err
 		}
 	}
@@ -73,22 +51,12 @@ func ParsePrivateKeyFromPEM(pemStr string) (*ecdsa.PrivateKey, error) {
 
 	return pkey, nil
 }
-
-// ParsePublicKeyFromPEM parses a PEM encoded PKCS1 or PKCS8 public key
-func ParsePublicKeyFromPEM(pemStr string) (*ecdsa.PublicKey, error) {
-	key := []byte(pemStr)
+func ParsePublicKeyFromDer(pubDer []byte) (*ecdsa.PublicKey, error) {
 	var err error
-
-	// Parse PEM block
-	var block *pem.Block
-	if block, _ = pem.Decode(key); block == nil {
-		return nil, errKeyMustBePEMEncoded
-	}
-
 	// Parse the key
 	var parsedKey interface{}
-	if parsedKey, err = x509.ParsePKIXPublicKey(block.Bytes); err != nil {
-		if cert, err := x509.ParseCertificate(block.Bytes); err == nil {
+	if parsedKey, err = x509.ParsePKIXPublicKey(pubDer); err != nil {
+		if cert, err := x509.ParseCertificate(pubDer); err == nil {
 			parsedKey = cert.PublicKey
 		} else {
 			return nil, err
@@ -102,4 +70,50 @@ func ParsePublicKeyFromPEM(pemStr string) (*ecdsa.PublicKey, error) {
 	}
 
 	return pkey, nil
+}
+
+func PrivateKeyToPem(priDer []byte) (priPem string, err error) {
+	priBlock := pem.Block{
+		Type:  "ECDSA Private Key",
+		Bytes: priDer,
+	}
+	pri := pem.EncodeToMemory(&priBlock)
+	if pri == nil {
+		err = errors.New("encode pem failed")
+		return
+	}
+	priPem = string(pri)
+	return
+}
+
+func PublicKeyToPem(pubDer []byte) (pubPem string, err error) {
+	pubBlock := pem.Block{
+		Type:  "ECDSA Public Key",
+		Bytes: pubDer,
+	}
+	pub := pem.EncodeToMemory(&pubBlock)
+	if pub == nil {
+		err = errors.New("encode pem failed")
+		return
+	}
+	pubPem = string(pub)
+	return
+}
+
+func PrivatePemToKey(priPem string) (pri *ecdsa.PrivateKey, err error) {
+	var priBlock *pem.Block
+	if priBlock, _ = pem.Decode([]byte(priPem)); priBlock == nil {
+		return nil, errKeyMustBePEMEncoded
+	}
+	pri, err = ParsePrivateKeyFromDer(priBlock.Bytes)
+	return
+}
+
+func PublicPemToKey(pubPem string) (pri *ecdsa.PublicKey, err error) {
+	var pubBlock *pem.Block
+	if pubBlock, _ = pem.Decode([]byte(pubPem)); pubBlock == nil {
+		return nil, errKeyMustBePEMEncoded
+	}
+	pri, err = ParsePublicKeyFromDer(pubBlock.Bytes)
+	return
 }
